@@ -83,6 +83,14 @@ import {
   deployAgentkitProject,
   generateAgentProject,
   runGeneratedAgentTestSSE,
+  getRdsRegions,
+  getRdsInstances,
+  getVikingRegions,
+  getVikingCollections,
+  type RdsRegion,
+  type RdsInstance,
+  type VikingRegion,
+  type VikingCollection,
 } from "../adk/client";
 import type {
   DeployStage,
@@ -401,6 +409,316 @@ function RuntimeEnvFields({
           />
         </label>
       ))}
+    </div>
+  );
+}
+
+function RdsEnvFields({
+  engine,
+  env,
+  values,
+  onChange,
+}: {
+  engine: "mysql" | "postgresql";
+  env: EnvVar[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+}) {
+  const [regions, setRegions] = useState<RdsRegion[]>([]);
+  const [instances, setInstances] = useState<RdsInstance[]>([]);
+  const [loadingRegions, setLoadingRegions] = useState(false);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+  const [regionError, setRegionError] = useState<string | null>(null);
+  const [instanceError, setInstanceError] = useState<string | null>(null);
+
+  const regionKey = engine === "mysql"
+    ? "DATABASE_VE_RDS_MYSQL_REGION"
+    : "DATABASE_VE_RDS_POSTGRESQL_REGION";
+  const instanceKey = engine === "mysql"
+    ? "DATABASE_VE_RDS_MYSQL_INSTANCE_ID"
+    : "DATABASE_VE_RDS_POSTGRESQL_INSTANCE_ID";
+
+  const currentRegion = values[regionKey] ?? "cn-beijing";
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadRegions() {
+      setLoadingRegions(true);
+      setRegionError(null);
+      try {
+        const data = await getRdsRegions();
+        if (mounted) setRegions(data);
+      } catch (e) {
+        if (mounted) setRegionError(e instanceof Error ? e.message : "加载区域失败");
+      } finally {
+        if (mounted) setLoadingRegions(false);
+      }
+    }
+    loadRegions();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!currentRegion) {
+      setInstances([]);
+      return;
+    }
+    let mounted = true;
+    async function loadInstances() {
+      setLoadingInstances(true);
+      setInstanceError(null);
+      try {
+        const data = await getRdsInstances(currentRegion, engine);
+        if (mounted) setInstances(data);
+      } catch (e) {
+        if (mounted) setInstanceError(e instanceof Error ? e.message : "加载实例失败");
+      } finally {
+        if (mounted) setLoadingInstances(false);
+      }
+    }
+    loadInstances();
+    return () => { mounted = false; };
+  }, [currentRegion, engine]);
+
+  return (
+    <div className="cw-env-fields">
+      <label className="cw-env-field">
+        <span className="cw-env-field-head">
+          <span className="cw-env-field-label">
+            区域
+            <span className="cw-req">*</span>
+          </span>
+          <code title={regionKey}>{regionKey}</code>
+        </span>
+        {loadingRegions && <div className="cw-input" style={{ display: "flex", alignItems: "center" }}><Loader2 className="cw-i cw-spin" />&nbsp;加载中...</div>}
+        {regionError && <div className="cw-error-text">{regionError}</div>}
+        {!loadingRegions && !regionError && (
+          <select
+            className="cw-input"
+            value={currentRegion}
+            onChange={(event) => {
+              onChange(regionKey, event.currentTarget.value);
+              onChange(instanceKey, "");
+            }}
+          >
+            {regions.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        )}
+      </label>
+
+      <label className="cw-env-field">
+        <span className="cw-env-field-head">
+          <span className="cw-env-field-label">
+            RDS 实例
+            <span className="cw-req">*</span>
+          </span>
+          <code title={instanceKey}>{instanceKey}</code>
+        </span>
+        {loadingInstances && <div className="cw-input" style={{ display: "flex", alignItems: "center" }}><Loader2 className="cw-i cw-spin" />&nbsp;加载中...</div>}
+        {instanceError && <div className="cw-error-text">{instanceError}</div>}
+        {!loadingInstances && !instanceError && (
+          <>
+            {instances.length > 0 ? (
+              <select
+                className="cw-input"
+                value={values[instanceKey] ?? ""}
+                onChange={(event) => onChange(instanceKey, event.currentTarget.value)}
+              >
+                <option value="">-- 请选择实例 --</option>
+                {instances.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({i.status})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ padding: "8px 0", color: "#6b7280" }}>
+                该区域下没有找到 {engine.toUpperCase()} 实例，请先在火山引擎控制台创建实例
+              </div>
+            )}
+          </>
+        )}
+      </label>
+
+      {env.map((item) => {
+        if (item.key === regionKey || item.key === instanceKey) return null;
+        return (
+          <label className="cw-env-field" key={item.key}>
+            <span className="cw-env-field-head">
+              <span className="cw-env-field-label">
+                {item.comment || item.key}
+                {item.required && <span className="cw-req">*</span>}
+              </span>
+              {item.comment && <code title={item.key}>{item.key}</code>}
+            </span>
+            <input
+              className="cw-input"
+              type={isSensitiveEnv(item.key) ? "password" : "text"}
+              value={values[item.key] ?? ""}
+              placeholder={item.placeholder || "请输入参数值"}
+              autoComplete="off"
+              onChange={(event) => onChange(item.key, event.currentTarget.value)}
+            />
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function VikingEnvFields({
+  env,
+  values,
+  onChange,
+}: {
+  env: EnvVar[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+}) {
+  const [regions, setRegions] = useState<VikingRegion[]>([]);
+  const [collections, setCollections] = useState<VikingCollection[]>([]);
+  const [loadingRegions, setLoadingRegions] = useState(false);
+  const [loadingCollections, setLoadingCollections] = useState(false);
+  const [regionError, setRegionError] = useState<string | null>(null);
+  const [collectionError, setCollectionError] = useState<string | null>(null);
+
+  const regionKey = "DATABASE_VIKING_REGION";
+  const projectKey = "DATABASE_VIKING_PROJECT";
+
+  const currentRegion = values[regionKey] ?? "cn-beijing";
+  const currentProject = values[projectKey] ?? "default";
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadRegions() {
+      setLoadingRegions(true);
+      setRegionError(null);
+      try {
+        const data = await getVikingRegions();
+        if (mounted) setRegions(data);
+      } catch (e) {
+        if (mounted) setRegionError(e instanceof Error ? e.message : "加载区域失败");
+      } finally {
+        if (mounted) setLoadingRegions(false);
+      }
+    }
+    loadRegions();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!currentRegion) {
+      setCollections([]);
+      return;
+    }
+    let mounted = true;
+    async function loadCollections() {
+      setLoadingCollections(true);
+      setCollectionError(null);
+      try {
+        const data = await getVikingCollections(currentRegion, currentProject);
+        if (mounted) setCollections(data);
+      } catch (e) {
+        if (mounted) setCollectionError(e instanceof Error ? e.message : "加载集合失败");
+      } finally {
+        if (mounted) setLoadingCollections(false);
+      }
+    }
+    loadCollections();
+    return () => { mounted = false; };
+  }, [currentRegion, currentProject]);
+
+  return (
+    <div className="cw-env-fields">
+      <label className="cw-env-field">
+        <span className="cw-env-field-head">
+          <span className="cw-env-field-label">
+            区域
+            <span className="cw-req">*</span>
+          </span>
+          <code title={regionKey}>{regionKey}</code>
+        </span>
+        {loadingRegions && <div className="cw-input" style={{ display: "flex", alignItems: "center" }}><Loader2 className="cw-i cw-spin" />&nbsp;加载中...</div>}
+        {regionError && <div className="cw-error-text">{regionError}</div>}
+        {!loadingRegions && !regionError && (
+          <select
+            className="cw-input"
+            value={currentRegion}
+            onChange={(event) => {
+              onChange(regionKey, event.currentTarget.value);
+            }}
+          >
+            {regions.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        )}
+      </label>
+
+      <label className="cw-env-field">
+        <span className="cw-env-field-head">
+          <span className="cw-env-field-label">
+            项目
+          </span>
+          <code title={projectKey}>{projectKey}</code>
+        </span>
+        <input
+          className="cw-input"
+          type="text"
+          value={currentProject}
+          placeholder="default"
+          autoComplete="off"
+          onChange={(event) => onChange(projectKey, event.currentTarget.value)}
+        />
+      </label>
+
+      <label className="cw-env-field">
+        <span className="cw-env-field-head">
+          <span className="cw-env-field-label">
+            VikingDB 集合
+          </span>
+        </span>
+        {loadingCollections && <div className="cw-input" style={{ display: "flex", alignItems: "center" }}><Loader2 className="cw-i cw-spin" />&nbsp;加载中...</div>}
+        {collectionError && <div className="cw-error-text">{collectionError}</div>}
+        {!loadingCollections && !collectionError && (
+          <>
+            {collections.length > 0 ? (
+              <div style={{ padding: "8px 0", color: "#374151", fontSize: "0.875rem" }}>
+                可用集合: {collections.map((c) => c.name).join(", ")}
+              </div>
+            ) : (
+              <div style={{ padding: "8px 0", color: "#6b7280" }}>
+                该区域/项目下没有找到 VikingDB 集合，将自动创建新集合
+              </div>
+            )}
+          </>
+        )}
+      </label>
+
+      {env.map((item) => {
+        if (item.key === regionKey || item.key === projectKey) return null;
+        return (
+          <label className="cw-env-field" key={item.key}>
+            <span className="cw-env-field-head">
+              <span className="cw-env-field-label">
+                {item.comment || item.key}
+                {item.required && <span className="cw-req">*</span>}
+              </span>
+              {item.comment && <code title={item.key}>{item.key}</code>}
+            </span>
+            <input
+              className="cw-input"
+              type={isSensitiveEnv(item.key) ? "password" : "text"}
+              value={values[item.key] ?? ""}
+              placeholder={item.placeholder || "请输入参数值"}
+              autoComplete="off"
+              onChange={(event) => onChange(item.key, event.currentTarget.value)}
+            />
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -2610,20 +2928,38 @@ export function CustomCreate({
                                             patch({ shortTermBackend: id })
                                           }
                             />
-                            <RuntimeEnvFields
-                              env={
-                                STM_BACKENDS.find(
-                                  (item) =>
-                                                item.id ===
-                                                (node.shortTermBackend ??
-                                                  "local"),
-                                )?.env ?? []
-                              }
-                                          values={
-                                            draft.deployment?.envValues ?? {}
-                                          }
-                              onChange={patchDeploymentEnv}
-                            />
+                            {(node.shortTermBackend === "ve_rds_mysql" || node.shortTermBackend === "ve_rds_postgresql") ? (
+                              <RdsEnvFields
+                                engine={node.shortTermBackend === "ve_rds_mysql" ? "mysql" : "postgresql"}
+                                env={
+                                  STM_BACKENDS.find(
+                                    (item) =>
+                                                  item.id ===
+                                                  (node.shortTermBackend ??
+                                                    "local"),
+                                  )?.env ?? []
+                                }
+                                values={
+                                  draft.deployment?.envValues ?? {}
+                                }
+                                onChange={patchDeploymentEnv}
+                              />
+                            ) : (
+                              <RuntimeEnvFields
+                                env={
+                                  STM_BACKENDS.find(
+                                    (item) =>
+                                                  item.id ===
+                                                  (node.shortTermBackend ??
+                                                    "local"),
+                                  )?.env ?? []
+                                }
+                                values={
+                                  draft.deployment?.envValues ?? {}
+                                }
+                                onChange={patchDeploymentEnv}
+                              />
+                            )}
                           </div>
                         )}
                         <Toggle
@@ -2652,20 +2988,37 @@ export function CustomCreate({
                                             patch({ longTermBackend: id })
                                           }
                             />
-                            <RuntimeEnvFields
-                              env={
-                                LTM_BACKENDS.find(
-                                  (item) =>
-                                                item.id ===
-                                                (node.longTermBackend ??
-                                                  "local"),
-                                )?.env ?? []
-                              }
-                                          values={
-                                            draft.deployment?.envValues ?? {}
-                                          }
-                              onChange={patchDeploymentEnv}
-                            />
+                            {node.longTermBackend === "viking" ? (
+                              <VikingEnvFields
+                                env={
+                                  LTM_BACKENDS.find(
+                                    (item) =>
+                                                  item.id ===
+                                                  (node.longTermBackend ??
+                                                    "local"),
+                                  )?.env ?? []
+                                }
+                                values={
+                                  draft.deployment?.envValues ?? {}
+                                }
+                                onChange={patchDeploymentEnv}
+                              />
+                            ) : (
+                              <RuntimeEnvFields
+                                env={
+                                  LTM_BACKENDS.find(
+                                    (item) =>
+                                                  item.id ===
+                                                  (node.longTermBackend ??
+                                                    "local"),
+                                  )?.env ?? []
+                                }
+                                values={
+                                  draft.deployment?.envValues ?? {}
+                                }
+                                onChange={patchDeploymentEnv}
+                              />
+                            )}
                             <Toggle
                               checked={!!node.autoSaveSession}
                                           onChange={(v) =>

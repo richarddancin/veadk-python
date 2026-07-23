@@ -133,29 +133,60 @@ observability:
 database:
   # [optional]
   opensearch:
-    host:       # should without `http://` or `https://` 
+    host:       # should without `http://` or `https://`
     port: 9200  # default OpenSearch port
-    username: 
-    password: 
+    username:
+    password:
   # [optional]
   mysql:
-    host: 
-    user: 
-    password: 
-    database: 
+    host:
+    user:
+    password:
+    database:
     charset: utf8
   # [optional]
   postgresql:
-    host: # host or ip 
-    user: 
+    host: # host or ip
+    user:
     password:
     database: # database with options sinlardb?sslmode=require&channel_binding=require&options=endpoint%3Dcp-great-pearl-0a074332
+  # [optional] Volcengine RDS MySQL (auto discovers connection from instance ID)
+  ve_rds_mysql:
+    access_key:       # Volcengine Access Key
+    secret_key:       # Volcengine Secret Access Key
+    region: cn-beijing
+    instance_id:      # RDS MySQL Instance ID
+    db_name: veadk_stm
+    db_user: veadk
+    db_password:      # Optional: auto-generated if not set
+    # Optional direct connection: if set, bypasses RDS API
+    host:
+    port: 3306
+    user:
+    password:
+    database:
+    charset: utf8mb4
+  # [optional] Volcengine RDS PostgreSQL (auto discovers connection from instance ID)
+  ve_rds_postgresql:
+    access_key:       # Volcengine Access Key
+    secret_key:       # Volcengine Secret Access Key
+    region: cn-beijing
+    instance_id:      # RDS PostgreSQL Instance ID
+    db_name: veadk_stm
+    db_user: veadk
+    db_password:      # Optional: auto-generated if not set
+    # Optional direct connection: if set, bypasses RDS API
+    host:
+    port: 5432
+    user:
+    password:
+    database:
   # [optional]
   redis:
-    host: 
+    host:
     port: 6379  # default Redis port
-    password: 
-    db: 0       # default 
+    password:
+    db: 0       # default
   # [optional] for KnowledgeBase(backend="milvus")
   milvus:
     uri: ./milvus.db # local Milvus Lite file path or remote URI, for example http://localhost:19530

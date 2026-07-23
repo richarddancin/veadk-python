@@ -15,7 +15,7 @@
 import os
 from functools import cached_property
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from veadk.consts import DEFAULT_TOS_BUCKET_NAME
@@ -232,3 +232,141 @@ class MSENacosConfig(BaseSettings):
 
     username: str = "nacos"  # hard coding by Volcengine MSE Nacos service
     password: str
+
+
+class VeRdsMysqlConfig(BaseSettings):
+    """Configuration for Volcengine RDS MySQL.
+
+    This configuration can either use an existing RDS instance by specifying
+    the instance ID, or use direct connection details like a regular MySQL."""
+    model_config = SettingsConfigDict(env_prefix="DATABASE_VE_RDS_MYSQL_")
+
+    # Volcengine authentication
+    access_key: str = ""
+    """Volcengine Access Key ID."""
+
+    secret_key: str = ""
+    """Volcengine Secret Access Key."""
+
+    region: str = "cn-beijing"
+    """Volcengine region for the RDS instance."""
+
+    # RDS instance selection
+    instance_id: str = ""
+    """Volcengine RDS MySQL Instance ID to use."""
+
+    # Database configuration (if not using an existing DB on the instance)
+    db_name: str = "veadk_stm"
+    """Database name to use on the RDS instance (created if doesn't exist)."""
+
+    db_user: str = "veadk"
+    """Database username to use (created if doesn't exist)."""
+
+    db_password: str = ""
+    """Database password (if not specified, one will be generated when creating)."""
+
+    # Direct connection options (if already have the connection details)
+    host: str = ""
+    """Direct host to use (bypasses instance ID lookup if provided)."""
+
+    port: int = 3306
+    """Direct port to use."""
+
+    user: str = ""
+    """Direct database user to use."""
+
+    password: str = ""
+    """Direct database password to use."""
+
+    database: str = ""
+    """Direct database name to use."""
+
+    charset: str = "utf8mb4"
+    """Database charset to use."""
+
+    @property
+    def uses_direct_connection(self) -> bool:
+        """Whether this config uses direct connection details."""
+        return bool(self.host and self.user and self.password and self.database)
+
+    @property
+    def uses_rds_api(self) -> bool:
+        """Whether this config uses the RDS API to get connection details."""
+        return bool(self.instance_id and (self.access_key or os.getenv("VOLCENGINE_ACCESS_KEY")) and (self.secret_key or os.getenv("VOLCENGINE_SECRET_KEY")))
+
+    @model_validator(mode="after")
+    def set_credentials_from_global(self) -> "VeRdsMysqlConfig":
+        if not self.access_key:
+            self.access_key = os.getenv("VOLCENGINE_ACCESS_KEY", "")
+        if not self.secret_key:
+            self.secret_key = os.getenv("VOLCENGINE_SECRET_KEY", "")
+        return self
+
+
+class VeRdsPostgresqlConfig(BaseSettings):
+    """Configuration for Volcengine RDS PostgreSQL.
+
+    This configuration can either use an existing RDS instance by specifying
+    the instance ID, or use direct connection details like a regular PostgreSQL."""
+    model_config = SettingsConfigDict(env_prefix="DATABASE_VE_RDS_POSTGRESQL_")
+
+    # Volcengine authentication
+    access_key: str = ""
+    """Volcengine Access Key ID."""
+
+    secret_key: str = ""
+    """Volcengine Secret Access Key."""
+
+    region: str = "cn-beijing"
+    """Volcengine region for the RDS instance."""
+
+    # RDS instance selection
+    instance_id: str = ""
+    """Volcengine RDS PostgreSQL Instance ID to use."""
+
+    # Database configuration (if not using an existing DB on the instance)
+    db_name: str = "veadk_stm"
+    """Database name to use on the RDS instance (created if doesn't exist)."""
+
+    db_user: str = "veadk"
+    """Database username to use (created if doesn't exist)."""
+
+    db_password: str = ""
+    """Database password (if not specified, one will be generated when creating)."""
+
+    # Direct connection options (if already have the connection details)
+    host: str = ""
+    """Direct host to use (bypasses instance ID lookup if provided)."""
+
+    port: int = 5432
+    """Direct port to use."""
+
+    user: str = ""
+    """Direct database user to use."""
+
+    password: str = ""
+    """Direct database password to use."""
+
+    database: str = ""
+    """Direct database name to use."""
+
+    schema: str = ""
+    """Optional PostgreSQL schema to isolate this deployment's short-term memory."""
+
+    @property
+    def uses_direct_connection(self) -> bool:
+        """Whether this config uses direct connection details."""
+        return bool(self.host and self.user and self.password and self.database)
+
+    @property
+    def uses_rds_api(self) -> bool:
+        """Whether this config uses the RDS API to get connection details."""
+        return bool(self.instance_id and (self.access_key or os.getenv("VOLCENGINE_ACCESS_KEY")) and (self.secret_key or os.getenv("VOLCENGINE_SECRET_KEY")))
+
+    @model_validator(mode="after")
+    def set_credentials_from_global(self) -> "VeRdsPostgresqlConfig":
+        if not self.access_key:
+            self.access_key = os.getenv("VOLCENGINE_ACCESS_KEY", "")
+        if not self.secret_key:
+            self.secret_key = os.getenv("VOLCENGINE_SECRET_KEY", "")
+        return self

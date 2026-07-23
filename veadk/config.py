@@ -24,8 +24,11 @@ from veadk.configs.database_configs import (
     MilvusConfig,
     MysqlConfig,
     OpensearchConfig,
+    PostgreSqlConfig,
     RedisConfig,
     TOSConfig,
+    VeRdsMysqlConfig,
+    VeRdsPostgresqlConfig,
     VikingKnowledgebaseConfig,
 )
 from veadk.configs.model_configs import ModelConfig
@@ -79,6 +82,9 @@ class VeADKConfig(BaseModel):
     tos: TOSConfig = Field(default_factory=TOSConfig)
     opensearch: OpensearchConfig = Field(default_factory=OpensearchConfig)
     mysql: MysqlConfig = Field(default_factory=MysqlConfig)
+    postgresql: PostgreSqlConfig = Field(default_factory=PostgreSqlConfig)
+    ve_rds_mysql: VeRdsMysqlConfig = Field(default_factory=VeRdsMysqlConfig)
+    ve_rds_postgresql: VeRdsPostgresqlConfig = Field(default_factory=VeRdsPostgresqlConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     milvus: MilvusConfig = Field(default_factory=MilvusConfig)
     viking_knowledgebase: VikingKnowledgebaseConfig = Field(

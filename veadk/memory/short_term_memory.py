@@ -32,6 +32,12 @@ from veadk.memory.short_term_memory_backends.postgresql_backend import (
 from veadk.memory.short_term_memory_backends.sqlite_backend import (
     SQLiteSTMBackend,
 )
+from veadk.memory.short_term_memory_backends.ve_rds_mysql_backend import (
+    VeRdsMysqlSTMBackend,
+)
+from veadk.memory.short_term_memory_backends.ve_rds_postgresql_backend import (
+    VeRdsPostgresqlSTMBackend,
+)
 from veadk.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -76,7 +82,9 @@ class ShortTermMemory(BaseModel):
             A callback to be called after loading memory from the backend. The callback function should accept `Session` as an input.
     """
 
-    backend: Literal["local", "mysql", "sqlite", "postgresql", "database"] = "local"
+    backend: Literal[
+        "local", "mysql", "sqlite", "postgresql", "database", "ve_rds_mysql", "ve_rds_postgresql"
+    ] = "local"
 
     backend_configs: dict = Field(default_factory=dict)
 
@@ -121,6 +129,14 @@ class ShortTermMemory(BaseModel):
                     ).session_service
                 case "postgresql":
                     self._session_service = PostgreSqlSTMBackend(
+                        db_kwargs=self.db_kwargs, **self.backend_configs
+                    ).session_service
+                case "ve_rds_mysql":
+                    self._session_service = VeRdsMysqlSTMBackend(
+                        db_kwargs=self.db_kwargs, **self.backend_configs
+                    ).session_service
+                case "ve_rds_postgresql":
+                    self._session_service = VeRdsPostgresqlSTMBackend(
                         db_kwargs=self.db_kwargs, **self.backend_configs
                     ).session_service
 

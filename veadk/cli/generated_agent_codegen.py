@@ -605,12 +605,23 @@ def render_requirements(extras: set[str], include_feishu_channel: bool) -> str:
     # Pin minimum versions so the Docker image upgrades past pre-installed
     # older veadk releases that lack the newer tools and use Starlette 1.x
     # which removed Router.on_startup (breaks AgentkitAgentServer.lifespan).
+    import os
     all_extras = set(extras)
     if include_feishu_channel:
         all_extras.add("extensions")
     unique_extras = sorted(all_extras)
     extras_str = f"[{','.join(unique_extras)}]" if unique_extras else ""
-    pkg = f"veadk-python{extras_str}>=1.0.5"
+
+    # Use fork for testing when VEADK_USE_FORK is set
+    if os.environ.get("VEADK_USE_FORK") == "1":
+        pkg = "veadk-python @ git+https://github.com/richarddancin/veadk-python.git@feat/volcengine-rds-stm"
+        if extras_str:
+            # Note: pip doesn't support extras with direct references well,
+            # but since our fork already includes all dependencies, this should work
+            pkg = f"veadk-python{extras_str} @ git+https://github.com/richarddancin/veadk-python.git@feat/volcengine-rds-stm"
+    else:
+        pkg = f"veadk-python{extras_str}>=1.0.8"
+
     packages = [pkg, "agentkit-sdk-python", "google-adk", "starlette<1.0.0"]
     return "\n".join(packages) + "\n"
 

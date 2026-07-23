@@ -235,6 +235,30 @@ export const STM_BACKENDS: BackendOption[] = [
       { key: "DATABASE_POSTGRESQL_DATABASE", required: true },
     ],
   },
+  {
+    id: "ve_rds_mysql",
+    label: "火山引擎 RDS MySQL",
+    desc: "通过火山引擎 RDS API 自动发现和配置 MySQL 实例。",
+    env: [
+      { key: "DATABASE_VE_RDS_MYSQL_INSTANCE_ID", required: true, comment: "实例 ID" },
+      { key: "DATABASE_VE_RDS_MYSQL_REGION", required: false, placeholder: "cn-beijing", comment: "区域" },
+      { key: "DATABASE_VE_RDS_MYSQL_DB_NAME", required: false, placeholder: "veadk_stm", comment: "数据库名" },
+      { key: "DATABASE_VE_RDS_MYSQL_DB_USER", required: false, placeholder: "veadk", comment: "数据库用户名" },
+      { key: "DATABASE_VE_RDS_MYSQL_DB_PASSWORD", required: false, comment: "数据库密码（可选，不填将自动生成）" },
+    ],
+  },
+  {
+    id: "ve_rds_postgresql",
+    label: "火山引擎 RDS PostgreSQL",
+    desc: "通过火山引擎 RDS API 自动发现和配置 PostgreSQL 实例。",
+    env: [
+      { key: "DATABASE_VE_RDS_POSTGRESQL_INSTANCE_ID", required: true, comment: "实例 ID" },
+      { key: "DATABASE_VE_RDS_POSTGRESQL_REGION", required: false, placeholder: "cn-beijing", comment: "区域" },
+      { key: "DATABASE_VE_RDS_POSTGRESQL_DB_NAME", required: false, placeholder: "veadk_stm", comment: "数据库名" },
+      { key: "DATABASE_VE_RDS_POSTGRESQL_DB_USER", required: false, placeholder: "veadk", comment: "数据库用户名" },
+      { key: "DATABASE_VE_RDS_POSTGRESQL_DB_PASSWORD", required: false, comment: "数据库密码（可选，不填将自动生成）" },
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -273,7 +297,10 @@ export const LTM_BACKENDS: BackendOption[] = [
     id: "viking",
     label: "VikingDB Memory",
     desc: "火山 VikingDB 记忆库（支持用户画像）。",
-    env: VOLC_ENV,
+    env: [
+      { key: "DATABASE_VIKING_REGION", required: false, placeholder: "cn-beijing", comment: "区域" },
+      { key: "DATABASE_VIKING_PROJECT", required: false, placeholder: "default", comment: "项目" },
+    ],
   },
   {
     id: "mem0",

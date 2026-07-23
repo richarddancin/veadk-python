@@ -1079,6 +1079,134 @@ def _run_frontend_server(
             "defaultView": "chat",
         }
 
+    @app.get("/web/rds-regions")
+    async def _web_rds_regions():
+        """List available Volcengine RDS regions."""
+        return {
+            "regions": [
+                {"id": "cn-beijing", "name": "华北 2 (北京)"},
+                {"id": "cn-shanghai", "name": "华东 1 (上海)"},
+            ]
+        }
+
+    @app.get("/web/rds-instances")
+    async def _web_rds_instances(region: str, engine: str):
+        """List RDS instances by region and engine (mysql/postgresql)."""
+        ak = os.getenv("VOLCENGINE_ACCESS_KEY")
+        sk = os.getenv("VOLCENGINE_SECRET_KEY")
+        if not (ak and sk):
+            raise HTTPException(
+                status_code=400, detail="VOLCENGINE_ACCESS_KEY and VOLCENGINE_SECRET_KEY are required"
+            )
+
+        if engine not in {"mysql", "postgresql"}:
+            raise HTTPException(status_code=400, detail="engine must be mysql or postgresql")
+
+        try:
+            if engine == "mysql":
+                from veadk.integrations.ve_rds_mysql.ve_rds_mysql import VeRdsMysqlClient
+                client = VeRdsMysqlClient(region=region, ak=ak, sk=sk)
+                resp = client.describe_db_instances(region=region)
+            else:
+                from veadk.integrations.ve_rds_postgresql.ve_rds_postgresql import VeRdsPostgresqlClient
+                client = VeRdsPostgresqlClient(region=region, ak=ak, sk=sk)
+                resp = client.describe_db_instances(region=region)
+
+            result = resp.get("Result", {})
+            instances = result.get("Instances", []) if isinstance(result, dict) else []
+
+            formatted = []
+            for instance in instances:
+                instance_id = instance.get("InstanceId", "")
+                instance_name = instance.get("InstanceName", "")
+                status = instance.get("InstanceStatus", "")
+                endpoint = ""
+
+                if engine == "mysql":
+                    endpoints = instance.get("Endpoints", {}).get("Address", [])
+                    for ep in endpoints:
+                        if ep.get("NetworkType") == "Private":
+                            endpoint = ep.get("Domain", "")
+                            break
+                    if not endpoint and endpoints:
+                        endpoint = endpoints[0].get("Domain", "")
+                else:
+                    endpoints = instance.get("Endpoints", [])
+                    for ep in endpoints:
+                        addrs = ep.get("Address", [])
+                        for addr in addrs:
+                            if addr.get("NetworkType") == "Private":
+                                endpoint = addr.get("Domain", "")
+                                break
+                        if endpoint:
+                            break
+                    if not endpoint and endpoints and endpoints[0].get("Address"):
+                        endpoint = endpoints[0]["Address"][0].get("Domain", "")
+
+                formatted.append({
+                    "id": instance_id,
+                    "name": instance_name or instance_id,
+                    "status": status,
+                    "endpoint": endpoint,
+                    "region": region,
+                    "engine": engine,
+                })
+
+            return {"instances": formatted}
+        except Exception as e:
+            logger.error("Failed to list RDS instances: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/web/viking-regions")
+    async def _web_viking_regions():
+        """List available Volcengine VikingDB regions."""
+        return {
+            "regions": [
+                {"id": "cn-beijing", "name": "华北 2 (北京)"},
+                {"id": "cn-shanghai", "name": "华东 1 (上海)"},
+            ]
+        }
+
+    @app.get("/web/viking-collections")
+    async def _web_viking_collections(region: str, project_name: str = "default"):
+        """List VikingDB collections by region and project."""
+        ak = os.getenv("VOLCENGINE_ACCESS_KEY")
+        sk = os.getenv("VOLCENGINE_SECRET_KEY")
+        if not (ak and sk):
+            raise HTTPException(
+                status_code=400, detail="VOLCENGINE_ACCESS_KEY and VOLCENGINE_SECRET_KEY are required"
+            )
+
+        try:
+            from veadk.integrations.ve_viking_db.ve_viking_db import VeVikingDBClient
+            client = VeVikingDBClient(region=region, ak=ak, sk=sk)
+            resp = client.list_collections(project_name=project_name)
+
+            result = resp.get("Result", {})
+            collections = result.get("Collections", []) if isinstance(result, dict) else []
+
+            formatted = []
+            for collection in collections:
+                collection_name = collection.get("CollectionName", "")
+                description = collection.get("Description", "")
+                status = collection.get("Status", "")
+                collection_type = collection.get("CollectionType", "")
+
+                formatted.append({
+                    "name": collection_name,
+                    "description": description,
+                    "status": status,
+                    "type": collection_type,
+                    "region": region,
+                    "project": project_name,
+                })
+
+            return {"collections": formatted}
+        except Exception as e:
+            logger.warning("Failed to list VikingDB collections (API may have changed): %s", e)
+            # Return empty list instead of 500 - the user can still type the collection name manually
+            return {"collections": []}
+
     @app.get("/web/agent-info/{app_name}")
     async def _web_agent_info(app_name: str):
         try:
@@ -2156,7 +2284,18 @@ def _run_frontend_server(
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 raise HTTPException(status_code=400, detail=f"Illegal file path: {fp}")
             full.parent.mkdir(parents=True, exist_ok=True)
-            full.write_text(fi.get("content", ""), encoding="utf-8")
+            content = fi.get("content", "")
+            # Override requirements to use fork when VEADK_USE_FORK is set
+            if fp == "requirements.txt" and os.environ.get("VEADK_USE_FORK") == "1":
+                import re
+                # Replace veadk-python>=x.y.z with our fork
+                content = re.sub(
+                    r"^veadk-python(\[.*\])?.*$",
+                    "veadk-python @ git+https://github.com/richarddancin/veadk-python.git@feat/volcengine-rds-stm",
+                    content,
+                    flags=re.MULTILINE
+                )
+            full.write_text(content, encoding="utf-8")
         if not (base / "app.py").exists():
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise HTTPException(status_code=400, detail="No app.py found in files")
@@ -3501,48 +3640,6 @@ def _resolve_studio_identity_region(
     )
 
 
-def _resolve_studio_cloud_credentials(
-    access_key: str | None,
-    secret_key: str | None,
-    credentials_path: Path | None = None,
-) -> tuple[str, str]:
-    """Resolve Studio deploy credentials from CLI, environment, or ~/.volc."""
-    import configparser
-
-    resolved_access_key = access_key or os.getenv("VOLCENGINE_ACCESS_KEY", "")
-    resolved_secret_key = secret_key or os.getenv("VOLCENGINE_SECRET_KEY", "")
-    if resolved_access_key and resolved_secret_key:
-        return resolved_access_key, resolved_secret_key
-
-    path = credentials_path or Path.home() / ".volc" / "credentials"
-    if path.is_file():
-        parser = configparser.ConfigParser(interpolation=None)
-        try:
-            with path.open(encoding="utf-8") as credentials_file:
-                parser.read_file(credentials_file)
-        except (OSError, UnicodeError, configparser.Error) as error:
-            raise click.ClickException(
-                f"Failed to read Volcengine credentials file '{path}': {error}"
-            ) from error
-        default_profile = parser["default"] if parser.has_section("default") else {}
-        resolved_access_key = (
-            resolved_access_key or str(default_profile.get("access_key_id", "")).strip()
-        )
-        resolved_secret_key = (
-            resolved_secret_key
-            or str(default_profile.get("secret_access_key", "")).strip()
-        )
-
-    if resolved_access_key and resolved_secret_key:
-        return resolved_access_key, resolved_secret_key
-    raise click.ClickException(
-        "Volcengine credentials required: pass --volcengine-access-key/"
-        "--volcengine-secret-key, set VOLCENGINE_ACCESS_KEY/"
-        "VOLCENGINE_SECRET_KEY, or configure the [default] profile in "
-        "~/.volc/credentials."
-    )
-
-
 @studio.command("deploy")
 @click.option(
     "--user-pool-id",
@@ -3682,7 +3779,7 @@ def frontend_deploy(
     import tempfile
     import shutil
 
-    from veadk.config import veadk_environments
+    from veadk.config import getenv, veadk_environments
 
     try:
         branding_title = normalize_site_title(site_title)
@@ -3690,10 +3787,13 @@ def frontend_deploy(
     except ValueError as error:
         raise click.ClickException(str(error)) from error
 
-    ak, sk = _resolve_studio_cloud_credentials(
-        volcengine_access_key,
-        volcengine_secret_key,
-    )
+    ak = volcengine_access_key or getenv("VOLCENGINE_ACCESS_KEY")
+    sk = volcengine_secret_key or getenv("VOLCENGINE_SECRET_KEY")
+    if not ak or not sk:
+        raise click.ClickException(
+            "Volcengine credentials required: set VOLCENGINE_ACCESS_KEY/SECRET_KEY "
+            "or pass --volcengine-access-key/--volcengine-secret-key."
+        )
 
     identity_region = _resolve_studio_identity_region(
         access_key=ak,
@@ -3777,7 +3877,7 @@ def frontend_deploy(
             raise click.ClickException(
                 f"AgentKit {purpose} CodeEnv Tool did not return a Tool ID."
             )
-        click.echo(f"Ensuring the AgentKit {purpose} model credential…")
+        click.echo(f"Ensuring the AgentKit {purpose} model credential relay…")
         try:
             ensure_skill_creator_model_credential(
                 tool_id=tool_id,
@@ -3792,10 +3892,10 @@ def frontend_deploy(
                 secrets=(ak, sk, session_token),
             )
             raise click.ClickException(
-                f"Failed to provision the AgentKit {purpose} model credential. "
+                f"Failed to provision the AgentKit {purpose} model credential relay. "
                 f"Underlying error:\n{detail}"
             ) from error
-        click.echo(f"AgentKit {purpose} model credential is ready.")
+        click.echo(f"AgentKit {purpose} model credential relay is ready.")
 
     chat_codex_tool_id = sandbox_tool_ids["chat"]
     skill_creator_tool_id = sandbox_tool_ids["skill"]
@@ -3827,7 +3927,6 @@ def frontend_deploy(
         veadk_environments["VEADK_STUDIO_DEVELOPERS"] = studio_developers
     veadk_environments["SANDBOX_CHAT_CODEX"] = chat_codex_tool_id
     veadk_environments["SANDBOX_SKILL_CREATOR"] = skill_creator_tool_id
-    veadk_environments["AGENTKIT_SANDBOX_REGION"] = region
     if client_secret:
         veadk_environments["OAUTH2_CLIENT_SECRET"] = client_secret
 
@@ -4101,7 +4200,7 @@ def frontend_update(
             region=target.region,
             project_name=target.project,
         )
-        environment_overrides = {"AGENTKIT_SANDBOX_REGION": target.region}
+        environment_overrides = {}
         if branding_title is not None:
             environment_overrides["VEADK_SITE_TITLE"] = branding_title
         if sandbox_chat_codex_tool_id is not None:

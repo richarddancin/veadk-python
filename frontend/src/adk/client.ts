@@ -1227,3 +1227,61 @@ export async function deleteGeneratedAgentTestRun(runId: string): Promise<void> 
     throw new Error(await httpErrorMessage(res, "清理调试运行失败"));
   }
 }
+
+export interface RdsRegion {
+  id: string;
+  name: string;
+}
+
+export interface RdsInstance {
+  id: string;
+  name: string;
+  status: string;
+  endpoint: string;
+  region: string;
+  engine: "mysql" | "postgresql";
+}
+
+export async function getRdsRegions(): Promise<RdsRegion[]> {
+  const res = await apiFetch("/web/rds-regions");
+  if (!res.ok) throw new Error(await httpErrorMessage(res, "加载 RDS 区域失败"));
+  const d = await res.json();
+  return (d.regions ?? []) as RdsRegion[];
+}
+
+export async function getRdsInstances(region: string, engine: "mysql" | "postgresql"): Promise<RdsInstance[]> {
+  const params = new URLSearchParams({ region, engine });
+  const res = await apiFetch(`/web/rds-instances?${params.toString()}`);
+  if (!res.ok) throw new Error(await httpErrorMessage(res, "加载 RDS 实例失败"));
+  const d = await res.json();
+  return (d.instances ?? []) as RdsInstance[];
+}
+
+export interface VikingRegion {
+  id: string;
+  name: string;
+}
+
+export interface VikingCollection {
+  name: string;
+  description: string;
+  status: string;
+  type: string;
+  region: string;
+  project: string;
+}
+
+export async function getVikingRegions(): Promise<VikingRegion[]> {
+  const res = await apiFetch("/web/viking-regions");
+  if (!res.ok) throw new Error(await httpErrorMessage(res, "加载 VikingDB 区域失败"));
+  const d = await res.json();
+  return (d.regions ?? []) as VikingRegion[];
+}
+
+export async function getVikingCollections(region: string, projectName: string = "default"): Promise<VikingCollection[]> {
+  const params = new URLSearchParams({ region, project_name: projectName });
+  const res = await apiFetch(`/web/viking-collections?${params.toString()}`);
+  if (!res.ok) throw new Error(await httpErrorMessage(res, "加载 VikingDB 集合失败"));
+  const d = await res.json();
+  return (d.collections ?? []) as VikingCollection[];
+}

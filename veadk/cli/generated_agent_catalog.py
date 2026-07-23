@@ -188,6 +188,26 @@ STM_BACKENDS = (
             EnvVar("DATABASE_POSTGRESQL_DATABASE", True),
         ),
     ),
+    BackendOption(
+        "ve_rds_mysql",
+        env=(
+            EnvVar("DATABASE_VE_RDS_MYSQL_INSTANCE_ID", True, "", "实例 ID"),
+            EnvVar("DATABASE_VE_RDS_MYSQL_REGION", False, "cn-beijing", "区域"),
+            EnvVar("DATABASE_VE_RDS_MYSQL_DB_NAME", False, "veadk_stm", "数据库名"),
+            EnvVar("DATABASE_VE_RDS_MYSQL_DB_USER", False, "veadk", "数据库用户名"),
+            EnvVar("DATABASE_VE_RDS_MYSQL_DB_PASSWORD", False, "", "数据库密码（可选，不填将自动生成）"),
+        ),
+    ),
+    BackendOption(
+        "ve_rds_postgresql",
+        env=(
+            EnvVar("DATABASE_VE_RDS_POSTGRESQL_INSTANCE_ID", True, "", "实例 ID"),
+            EnvVar("DATABASE_VE_RDS_POSTGRESQL_REGION", False, "cn-beijing", "区域"),
+            EnvVar("DATABASE_VE_RDS_POSTGRESQL_DB_NAME", False, "veadk_stm", "数据库名"),
+            EnvVar("DATABASE_VE_RDS_POSTGRESQL_DB_USER", False, "veadk", "数据库用户名"),
+            EnvVar("DATABASE_VE_RDS_POSTGRESQL_DB_PASSWORD", False, "", "数据库密码（可选，不填将自动生成）"),
+        ),
+    ),
 )
 
 LTM_BACKENDS = (
@@ -213,7 +233,13 @@ LTM_BACKENDS = (
         ),
         pip_extra="extensions",
     ),
-    BackendOption("viking", env=VOLC_ENV),
+    BackendOption(
+        "viking",
+        env=(
+            EnvVar("DATABASE_VIKING_REGION", False, "cn-beijing", "区域"),
+            EnvVar("DATABASE_VIKING_PROJECT", False, "default", "项目"),
+        ),
+    ),
     BackendOption(
         "mem0",
         env=(
