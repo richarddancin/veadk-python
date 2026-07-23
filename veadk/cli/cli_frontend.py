@@ -2285,16 +2285,18 @@ def _run_frontend_server(
                 raise HTTPException(status_code=400, detail=f"Illegal file path: {fp}")
             full.parent.mkdir(parents=True, exist_ok=True)
             content = fi.get("content", "")
-            # Override requirements to use fork when VEADK_USE_FORK is set
-            if fp == "requirements.txt" and os.environ.get("VEADK_USE_FORK") == "1":
-                import re
-                # Replace veadk-python>=x.y.z with our fork
-                content = re.sub(
-                    r"^veadk-python(\[.*\])?.*$",
-                    "veadk-python @ git+https://github.com/richarddancin/veadk-python.git@feat/volcengine-rds-stm",
-                    content,
-                    flags=re.MULTILINE
-                )
+            # Allow overriding the veadk requirement with an environment variable
+            if fp == "requirements.txt":
+                import os
+                veadk_req = os.environ.get("VEADK_REQUIREMENT")
+                if veadk_req:
+                    import re
+                    content = re.sub(
+                        r"^veadk-python(\[.*\])?.*$",
+                        veadk_req,
+                        content,
+                        flags=re.MULTILINE
+                    )
             full.write_text(content, encoding="utf-8")
         if not (base / "app.py").exists():
             shutil.rmtree(temp_dir, ignore_errors=True)

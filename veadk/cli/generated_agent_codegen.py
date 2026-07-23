@@ -612,13 +612,11 @@ def render_requirements(extras: set[str], include_feishu_channel: bool) -> str:
     unique_extras = sorted(all_extras)
     extras_str = f"[{','.join(unique_extras)}]" if unique_extras else ""
 
-    # Use fork for testing when VEADK_USE_FORK is set
-    if os.environ.get("VEADK_USE_FORK") == "1":
-        pkg = "veadk-python @ git+https://github.com/richarddancin/veadk-python.git@feat/volcengine-rds-stm"
-        if extras_str:
-            # Note: pip doesn't support extras with direct references well,
-            # but since our fork already includes all dependencies, this should work
-            pkg = f"veadk-python{extras_str} @ git+https://github.com/richarddancin/veadk-python.git@feat/volcengine-rds-stm"
+    # Allow overriding the veadk requirement with an environment variable
+    # This is useful for testing custom veadk builds or forks
+    veadk_req = os.environ.get("VEADK_REQUIREMENT")
+    if veadk_req:
+        pkg = veadk_req
     else:
         pkg = f"veadk-python{extras_str}>=1.0.8"
 
