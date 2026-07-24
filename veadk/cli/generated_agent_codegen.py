@@ -614,16 +614,9 @@ def render_requirements(extras: set[str], include_feishu_channel: bool) -> str:
 
     # Allow overriding the veadk requirement with an environment variable
     # This is useful for testing custom veadk builds or forks
-    # If the override contains 'git+' and doesn't have #egg=, we'll add it
     veadk_req = os.environ.get("VEADK_REQUIREMENT")
     if veadk_req:
-        if "git+" in veadk_req and "#egg=" not in veadk_req:
-            # Format git URL properly with egg name and extras
-            egg_name = f"veadk-python{extras_str}" if extras_str else "veadk-python"
-            pkg = f"{veadk_req}#egg={egg_name}"
-        else:
-            # Use the requirement as-is
-            pkg = veadk_req
+        pkg = veadk_req
     else:
         pkg = f"veadk-python{extras_str}>=1.0.8"
 

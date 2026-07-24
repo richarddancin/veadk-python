@@ -2291,27 +2291,11 @@ def _run_frontend_server(
             if fp == "requirements.txt":
                 veadk_req = os.environ.get("VEADK_REQUIREMENT")
                 if veadk_req:
-                    # First, extract the extras from the existing line if any
                     import re
-                    extras_match = re.search(r"^veadk-python(\[.*\])?", content, flags=re.MULTILINE)
-                    extras_str = extras_match.group(1) if extras_match else ""
-
-                    # Format the requirement properly
-                    if "git+" in veadk_req and "#egg=" not in veadk_req:
-                        # Git URL needs proper egg suffix
-                        egg_name = f"veadk-python{extras_str}" if extras_str else "veadk-python"
-                        final_req = f"{veadk_req}#egg={egg_name}"
-                    else:
-                        # Use as-is but make sure extras are included if needed
-                        final_req = veadk_req
-                        if extras_str and "[" not in final_req and "#egg=" not in final_req:
-                            # Add extras if they're not already there
-                            final_req = final_req.replace("veadk-python", f"veadk-python{extras_str}")
-
-                    # Replace the line
+                    # Just replace the veadk line entirely
                     content = re.sub(
-                        r"^veadk-python(\[.*\])?.*$",
-                        final_req,
+                        r"^veadk-python.*$",
+                        veadk_req,
                         content,
                         flags=re.MULTILINE
                     )
